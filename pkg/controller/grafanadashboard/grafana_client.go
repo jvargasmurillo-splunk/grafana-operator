@@ -14,6 +14,7 @@ import (
 
 const (
 	DeleteDashboardByUIDUrl    = "%v/api/dashboards/uid/%v"
+	GetDashboardByUIDUrl    = "%v/api/dashboards/uid/%v"
 	CreateOrUpdateDashboardUrl = "%v/api/dashboards/db"
 	CreateOrUpdateFolderUrl    = "%v/api/folders"
 	DeleteFolderByUIDUrl       = "%v/api/folders/%v"
@@ -59,6 +60,7 @@ type GrafanaFolderResponse struct {
 type GrafanaClient interface {
 	CreateOrUpdateDashboard(dashboard []byte, folderId int64, folderName string) (GrafanaResponse, error)
 	DeleteDashboardByUID(UID string) (GrafanaResponse, error)
+	GetDashboardByUID(UID string) (GrafanaResponse, error)
 	CreateOrUpdateFolder(folderName string) (GrafanaFolderResponse, error)
 	DeleteFolder(folderID *int64) error
 	SafeToDelete(dashboards []*v1alpha1.GrafanaDashboardRef, folderID *int64) bool
@@ -280,6 +282,47 @@ func (r *GrafanaClientImpl) DeleteDashboardByUID(UID string) (GrafanaResponse, e
 	if resp.StatusCode != 200 {
 		return response, fmt.Errorf(
 			"error deleting dashboard, expected status 200 but got %v",
+			resp.StatusCode)
+	}
+
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return response, err
+	}
+
+	err = json.Unmarshal(data, &response)
+
+	return response, err
+}
+
+// Get a dashboard given by a UID
+func (r *GrafanaClientImpl) GetDashboardByUID(UID string) (GrafanaResponse, error) {
+	rawURL := fmt.Sprintf(GetDashboardByUIDUrl, r.url, UID)
+	response := newResponse()
+
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return response, err
+	}
+
+	parsed.User = url.UserPassword(r.user, r.password)
+	req, err := http.NewRequest("GET", parsed.String(), nil)
+
+	if err != nil {
+		return response, err
+	}
+
+	setHeaders(req)
+
+	resp, err := r.client.Do(req)
+	if err != nil {
+		return response, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return response, fmt.Errorf(
+			"error getting dashboard, expected status 200 but got %v",
 			resp.StatusCode)
 	}
 

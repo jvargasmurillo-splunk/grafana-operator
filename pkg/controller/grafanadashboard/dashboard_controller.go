@@ -203,6 +203,7 @@ func (r *ReconcileGrafanaDashboard) reconcileDashboards(request reconcile.Reques
 
 	// Prepare lists
 	var dashboardsToDelete []*grafanav1alpha1.GrafanaDashboardRef
+	var dashboardUIDCollisions []*grafanav1alpha1.GrafanaDashboardRef
 
 	// Check if a given dashboard (by name) is present in the list of
 	// dashboards in the namespace
@@ -230,6 +231,12 @@ func (r *ReconcileGrafanaDashboard) reconcileDashboards(request reconcile.Reques
 	for _, dashboard := range knownDashboards {
 		if !inNamespace(dashboard) {
 			dashboardsToDelete = append(dashboardsToDelete, dashboard)
+		}
+	}
+
+	for _, dashboard := range knownDashboards {
+		if inNamespace(dashboard){
+		dashboardUIDCollisions = append(dashboardUIDCollisions, dashboard)
 		}
 	}
 
@@ -304,6 +311,20 @@ func (r *ReconcileGrafanaDashboard) reconcileDashboards(request reconcile.Reques
 		r.manageSuccess(&dashboard, &folderId, folderName)
 	}
 
+	if dashboardUIDCollisions != nil {
+		for _, dashboard := range dashboardUIDCollisions {
+			status, err := grafanaClient.GetDashboardByUID(dashboard.UID)
+			if err != nil {
+				log.Error(err, fmt.Sprintf("error getting dashboard %v, status was %v/%v",
+					dashboard.UID,
+					dashboard.Name,
+					dashboard.Namespace))
+			}
+			log.V(1).Info(fmt.Sprintf("get result was %v", *status.Message))
+		}
+
+	}
+
 	if dashboardsToDelete != nil {
 		for _, dashboard := range dashboardsToDelete {
 			status, err := grafanaClient.DeleteDashboardByUID(dashboard.UID)
@@ -347,7 +368,7 @@ func (r *ReconcileGrafanaDashboard) reconcileDashboards(request reconcile.Reques
 func (r *ReconcileGrafanaDashboard) manageSuccess(dashboard *grafanav1alpha1.GrafanaDashboard, folderId *int64, folderName string) {
 	msg := fmt.Sprintf("dashboard %v/%v successfully submitted",
 		dashboard.Namespace,
-		dashboard.Name)
+		dashboard.Name,)
 	r.recorder.Event(dashboard, "Normal", "Success", msg)
 	log.V(1).Info(msg)
 	r.config.AddDashboard(dashboard, folderId, folderName)
