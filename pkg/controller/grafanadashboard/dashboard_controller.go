@@ -23,6 +23,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	"time"
+	"strings"
 )
 
 const (
@@ -194,6 +195,7 @@ func (r *ReconcileGrafanaDashboard) reconcileDashboards(request reconcile.Reques
 
 	// Prepare lists
 	var dashboardsToDelete []*grafanav1alpha1.GrafanaDashboardRef
+	var dashboardUIDCollisions = make(map[string][]*grafanav1alpha1.GrafanaDashboardRef)
 
 	// Check if a given dashboard (by name) is present in the list of
 	// dashboards in the namespace
@@ -223,6 +225,23 @@ func (r *ReconcileGrafanaDashboard) reconcileDashboards(request reconcile.Reques
 			dashboardsToDelete = append(dashboardsToDelete, dashboard)
 		}
 
+	}
+
+	for _, dashboard := range knownDashboards {
+		if inNamespace(dashboard){
+		dashboardUIDCollisions[dashboard.UID] = append(dashboardUIDCollisions[dashboard.UID], dashboard)
+		}
+	}
+	for _, v := range dashboardUIDCollisions {
+		if len(v) > 1 {
+			var collisions []string
+			for _, d := range v {
+				collisions = append(collisions, fmt.Sprintf("%v/%v",
+				d.Namespace,
+				d.Name))
+			}
+			log.Info(fmt.Sprintf("UID collision detected for the following dashboard: %v", strings.Join(collisions[:], ", ")))
+		}
 	}
 
 	// Process new/updated dashboards
