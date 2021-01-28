@@ -234,13 +234,20 @@ func (r *ReconcileGrafanaDashboard) reconcileDashboards(request reconcile.Reques
 	}
 	for _, v := range dashboardUIDCollisions {
 		if len(v) > 1 {
-			var collisions []string
+			collisions := []string{}
 			for _, d := range v {
-				collisions = append(collisions, fmt.Sprintf("%v/%v",
-				d.Namespace,
-				d.Name))
+				for _, c := range v{
+					if c.Name == d.Name {
+						continue
+					} else {
+						collisions = append(collisions, fmt.Sprintf("%v/%v/%v", d.Namespace, d.Name, d.FolderName))
+						break
+					}
+				}
 			}
-			log.Info(fmt.Sprintf("UID collision detected for the following dashboard: %v", strings.Join(collisions[:], ", ")))
+			if len(collisions) > 1 {
+				log.Info(fmt.Sprintf("UID collision detected for the following dashboards: %v", strings.Join(collisions[:], ", ")))
+			}
 		}
 	}
 
